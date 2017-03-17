@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<style>
+div {
+	width: 800px;
+	height: 100vh;
+}
+</style>
+</head>
+<body>
+<div><canvas id="coinCanvas"></canvas></div>
+<script src="coin-bucket.js"></script>
+<script>
+var canvas = document.getElementById('coinCanvas');
+var bucket = coinBucket(canvas);
+var fill = 0;
+var spill = 0;
+setInterval(function() {
+	if (Math.random() < 0.3) {
+		spill += 1;
+	} else {
+		fill += 1;
+	}
+	bucket.update(fill, spill);
+}, 20);
+</script>
+</body>
+</html>
