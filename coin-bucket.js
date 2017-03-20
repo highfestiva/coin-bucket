@@ -165,6 +165,7 @@ function stopped(gl, coin) {
 	h1 +=    t  * gl.bucketHeight / gl.fullAmount;
 	setHeightData(gl, i0, h0);
 	setHeightData(gl, i1, h1);
+	return lerp(t, h0, h1);
 }
 
 function insideBucket(gl, coin) {
@@ -174,6 +175,21 @@ function insideBucket(gl, coin) {
 function xyInsideBucket(gl, x, y) {
 	var w2 = lerp(bucketScaleHeight(gl, y), gl.bucketBottomWidth2, gl.bucketTopWidth2);
 	return x > -w2 && x < +w2;
+}
+
+function placeSettledCoin(gl, isFill) {
+	var width = gl.bucketBottomWidth2 / gl.bucketHeightMapPercentage;
+	var offset = gl.bucketTopWidth2;
+	if (isFill) {
+		width = gl.bucketBottomWidth2;
+		offset = 0;
+	}
+	var x = Math.random() * width + offset
+	x = Math.random()<0.5? -x : +x;
+	var coin = new Coin(x, 0, isFill, true);
+	var y = stopped(gl, coin);
+	coin.y = y;
+	return coin;
 }
 
 function initGl(canvas, coinTexture, bucketFrontTexture, bucketBackTexture) {
@@ -186,6 +202,10 @@ function initGl(canvas, coinTexture, bucketFrontTexture, bucketBackTexture) {
 		gls[key] = canvas.getContext('webgl2');
 		if (!gls[key]) {
 			gls[key] = canvas.getContext("experimental-webgl2");
+		}
+		if (!gls[key]) {
+			alert('Your system does not support WebGL 2.');
+			return;
 		}
 		if (typeof WebGLDebugUtils !== 'undefined') {
 			gls[key] = WebGLDebugUtils.makeDebugContext(gls[key]);
@@ -207,7 +227,7 @@ function initGl(canvas, coinTexture, bucketFrontTexture, bucketBackTexture) {
 	gl.bucketTopWidth2 = gl.bucketTopWidth / 2;
 	gl.bucketBottomWidth2 = gl.bucketBottomWidth / 2;
 	gl.bucketHeight = gl.bucketFrontTexture.height;
-	gl.bucketHeightMapPercentage = 16 / 40;
+	gl.bucketHeightMapPercentage = 20 / gl.heightMap.length;
 	gl.recipHeightMapBucketBottomWidth = gl.heightMap.length / (gl.bucketBottomWidth/gl.bucketHeightMapPercentage);
 	gl.recipHeightMapBucketTopWidth = gl.heightMap.length / (gl.bucketTopWidth/gl.bucketHeightMapPercentage);
 	gl.bucketBottomHeightMapWidth2 = gl.bucketBottomWidth2 / gl.bucketHeightMapPercentage;
@@ -308,7 +328,7 @@ function createCoins(gl, count, isFill) {
 	if (count > 0) {
 		while (count > 1) {
 			count -= 1;
-			//placeCoin(getCoord(isFill));
+			gl.coins.push(placeSettledCoin(gl, isFill));
 		}
 		gl.coins.push(new Coin((Math.random()-0.5)*gl.bucketBottomWidth, canvas.height, isFill));
 	}
