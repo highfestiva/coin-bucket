@@ -13,7 +13,7 @@ div {
 <script src="coin-bucket.js"></script>
 <script>
 var canvas = document.getElementById('coinCanvas');
-var bucket = coinBucket(canvas);
+var bucket = coinBucket.init(canvas);
 var fill = 0;
 var spill = 0;
 setInterval(function() {
