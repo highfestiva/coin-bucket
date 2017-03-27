@@ -22,6 +22,9 @@ setInterval(function() {
 	} else {
 		fill += 1;
 	}
+	if (fill > 1000) {
+		spill = fill = 0;
+	}
 	bucket.update(fill, spill);
 }, 20);
 </script>

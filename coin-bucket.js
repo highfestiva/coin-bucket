@@ -239,6 +239,7 @@ coinBucket.initGl = function(canvas, coinTexture, bucketFrontTexture, bucketBack
 	gl.bucketTopHeightMapWidth2 = gl.bucketTopWidth2 / gl.bucketHeightMapPercentage;
 	gl.bucketHeightMapIndices2 = gl.heightMap.length * gl.bucketHeightMapPercentage / 2
 	gl.lastTime = Date.now();
+	gl.updated = true;
 
 	// Create, compile and link shaders.
 	var vertCode =
@@ -347,15 +348,27 @@ coinBucket.update = function(canvas, fill, spill, fullAmount) {
 	}
 
 	gl.fullAmount = fullAmount;
+	if (fill < gl.fill || spill < gl.spill) {
+		gl.coins.length = 0;
+		gl.fill = 0;
+		gl.spill = 0;
+		for (var i=0, N=gl.heightMap.length; i < N; ++i) {
+			gl.heightMap[i] = 0;
+		}
+	}
 	coinBucket.createCoins(gl, fill - gl.fill, true);
 	coinBucket.createCoins(gl, spill - gl.spill, false);
 	gl.fill = fill;
 	gl.spill = spill;
+	gl.updated = true;
 }
 
 coinBucket.renderScene = function(canvas) {
 	var key = canvas.getAttribute('coinIndex');
 	var gl = coinBucket.gls[key];
+	if (!gl.updated) {
+		return;
+	}
 
 	// Draw coinBucket back.
 	gl.disable(gl.BLEND);
@@ -377,8 +390,13 @@ coinBucket.renderScene = function(canvas) {
 	if (dt > 0.1) {
 		dt = 0.1;
 	}
+	var anyMoving = false;
 	for (var i=0, N=gl.coins.length; i<N; ++i) {
 		gl.coins[i].move(gl, dt);
+		anyMoving |= !gl.coins[i].isStopped;
+	}
+	if (!anyMoving) {
+		gl.updated = false;
 	}
 
 	// Connect shaders and bind buffers.
