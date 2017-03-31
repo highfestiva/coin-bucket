@@ -14,18 +14,18 @@ div {
 <script>
 var canvas = document.getElementById('coinCanvas');
 var bucket = coinBucket.init(canvas);
-var fill = 0;
-var spill = 0;
+var fill = 30;
+var spill = 10;
 setInterval(function() {
 	if (Math.random() < 0.3) {
 		spill += 1;
 	} else {
 		fill += 1;
 	}
-	if (fill > 1000) {
+	if (fill > 5000) {
 		spill = fill = 0;
 	}
-	bucket.update(fill, spill);
+	bucket.update(fill, spill, 2000);
 }, 20);
 </script>
 </body>

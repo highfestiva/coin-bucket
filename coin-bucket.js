@@ -18,15 +18,13 @@ coinBucket.Coin = function(x, y, isFill, isStopped) {
 	this.py = this.y;
 	this.vx = 0;
 	this.vy = 0;
+	this.collisions = 0;
 	this.isFill = isFill;
-	this.isStopped = false;
+	this.isStopped = isStopped;
 	this.lastCollisionHeight = 0;
 	this.lastCollisionSlope = 0;
 	this.lastCollisionWithBucket = false;
 	this.move = function(gl, t) {
-		if (this.isStopped) {
-			return;
-		}
 		this.px = this.x;
 		this.py = this.y;
 		this.vy -= t * 9.82 * coinBucket.scale;
@@ -36,12 +34,22 @@ coinBucket.Coin = function(x, y, isFill, isStopped) {
 			this.vx *= 0.5;
 			coinBucket.uncollide(gl, this, t);
 			var isInside = coinBucket.insideBucket(gl, this);
+			if (isInside && this.isFill && this.vy < -0.5) {
+				this.collisions += 1;
+				if (this.collisions >= 10) {
+					this.isStopped = true;
+					this.y = coinBucket.stopped(gl, this);
+					coinBucket.removeCloseCoins(gl, this);
+					return;
+				}
+			}
 			if (this.vy < 0 && this.vy > -10 && !this.lastCollisionWithBucket) {
 				if (this.isFill && !isInside) {
 					// We're yet to bounce back into the coinBucket!
 				} else {
 					this.isStopped = true;
-					coinBucket.stopped(gl, this);
+					this.y = coinBucket.stopped(gl, this);
+					coinBucket.removeCloseCoins(gl, this);
 					return;
 				}
 			}
@@ -71,6 +79,10 @@ coinBucket.Coin = function(x, y, isFill, isStopped) {
 			}
 		}
 	}
+}
+
+coinBucket.gaussRandom = function() {
+	return Math.sqrt(-2.0 * Math.log(Math.random())) * Math.cos(2.0 * Math.PI * Math.random());
 }
 
 coinBucket.lerp = function(t, a, b) {
@@ -128,7 +140,7 @@ coinBucket.collided = function(gl, coin) {
 	var i1 = i0 + 1;
 	var [t,h0,h1] = coinBucket.getHeightData(gl, coin, heightMapX, i0, i1);
 	var height = coinBucket.lerp(t, h0, h1);
-	coin.lastCollisionHeight = coinBucket.lerp(0.7, height, Math.min(h0,h1));
+	coin.lastCollisionHeight = coinBucket.lerp(0.5, height, Math.min(h0,h1));
 	//coin.lastCollisionHeight = height;
 	coin.lastCollisionSlope = h0 - h1;
 	coin.lastCollisionWithBucket = false;
@@ -181,16 +193,38 @@ coinBucket.xyInsideBucket = function(gl, x, y) {
 coinBucket.placeSettledCoin = function(gl, isFill) {
 	var width = gl.bucketBottomWidth2 / gl.bucketHeightMapPercentage;
 	var offset = gl.bucketTopWidth2;
+	var rnd = Math.abs((coinBucket.gaussRandom()+1.2) * 0.14);
 	if (isFill) {
-		width = gl.bucketBottomWidth2;
+		width = gl.bucketBottomWidth2*0.99;
 		offset = 0;
+		rnd = Math.random();
+		if (Math.random()*gl.bucketHeightMapIndices2 <= 0.6) {
+			rnd = 1;
+		}
 	}
-	var x = Math.random() * width + offset
+	var x = rnd * width + offset
 	x = Math.random()<0.5? -x : +x;
 	var coin = new coinBucket.Coin(x, 0, isFill, true);
-	var y = coinBucket.stopped(gl, coin);
-	coin.y = y;
+	coin.y = coinBucket.stopped(gl, coin);
+	if (isFill) {
+		// Scale X outwards when Y towards bucket top, so we're getting bucket-shaped coin pile when placing many at a time.
+		var t = coinBucket.bucketScaleHeight(gl, coin.y);
+		coin.x *= coinBucket.lerp(t, 1.0, 1.0/gl.bucketBottomConePart);
+	}
+	coinBucket.removeCloseCoins(gl, coin);
 	return coin;
+}
+
+coinBucket.removeCloseCoins = function(gl, coin) {
+	for (var i=gl.coins.length-1; i>=0; --i) {
+		if (Math.abs(gl.coins[i].x-coin.x) < 3) {
+			if (Math.abs(gl.coins[i].y-coin.y) < gl.coinCloseY) {
+				if (gl.coins[i] != coin) {
+					gl.coins.splice(i, 1);	// Drop old coin - YEY!
+				}
+			}
+		}
+	}
 }
 
 coinBucket.initGl = function(canvas, coinTexture, bucketFrontTexture, bucketBackTexture) {
@@ -208,10 +242,6 @@ coinBucket.initGl = function(canvas, coinTexture, bucketFrontTexture, bucketBack
 			alert('Your system does not support WebGL 2.');
 			return;
 		}
-		if (!coinBucket.gls[key]) {
-			alert('Your system does not support WebGL 2.');
-			return;
-		}
 		if (typeof WebGLDebugUtils !== 'undefined') {
 			coinBucket.gls[key] = WebGLDebugUtils.makeDebugContext(coinBucket.gls[key]);
 		}
@@ -223,6 +253,7 @@ coinBucket.initGl = function(canvas, coinTexture, bucketFrontTexture, bucketBack
 	gl.fill = 0;
 	gl.spill = 0;
 	gl.fullAmount = 1000;
+	gl.coinCloseY = 5000 / gl.fullAmount;
 	gl.heightMap = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 	gl.coins = [];
 	var bucketWidth = gl.bucketFrontTexture.width - 40;
@@ -290,8 +321,8 @@ coinBucket.initGl = function(canvas, coinTexture, bucketFrontTexture, bucketBack
 	gl.disable(gl.CULL_FACE);
 
 	// Create coin strip.
-	var xf = 2 / canvas.width;
-	var yf = 2 / canvas.height;
+	var xf = 2 / gl.canvas.width;
+	var yf = 2 / gl.canvas.height;
 	var w = gl.coinTexture.width/2;
 	gl.coinStrip = [-w*xf,-w*yf, +w*xf,-w*yf, -w*xf,+w*yf, +w*xf,+w*yf];
 	var textureStrip = [0,1, 1,1, 0,0, 1,0];
@@ -321,7 +352,7 @@ coinBucket.initGl = function(canvas, coinTexture, bucketFrontTexture, bucketBack
 	// Create coinBucket.
 	var w = gl.bucketFrontTexture.width/2;
 	var h = gl.bucketFrontTexture.height/2;
-	var y = (-canvas.height/2 + h + 6) * yf;
+	var y = (- gl.canvas.height/2 + h + 6) * yf;
 	gl.bucketStrip = [-w*xf,-h*yf+y, +w*xf,-h*yf+y, -w*xf,+h*yf+y, +w*xf,+h*yf+y];
 
 	gl.bucketVertexBuffer = gl.createBuffer();
@@ -334,9 +365,10 @@ coinBucket.createCoins = function(gl, count, isFill) {
 	if (count > 0) {
 		while (count > 1) {
 			count -= 1;
-			gl.coins.push(coinBucket.placeSettledCoin(gl, isFill));
+			var coin = coinBucket.placeSettledCoin(gl, isFill);
+			gl.coins.push(coin);
 		}
-		gl.coins.push(new coinBucket.Coin((Math.random()-0.5)*gl.bucketBottomWidth, canvas.height, isFill));
+		gl.coins.push(new coinBucket.Coin((Math.random()-0.5)*gl.bucketBottomWidth, gl.canvas.height, isFill));
 	}
 }
 
@@ -348,8 +380,9 @@ coinBucket.update = function(canvas, fill, spill, fullAmount) {
 	}
 
 	gl.fullAmount = fullAmount;
+	gl.coinCloseY = 5000 / gl.fullAmount;
 	if (fill < gl.fill || spill < gl.spill) {
-		gl.coins.length = 0;
+		gl.coins = [];
 		gl.fill = 0;
 		gl.spill = 0;
 		for (var i=0, N=gl.heightMap.length; i < N; ++i) {
@@ -391,9 +424,11 @@ coinBucket.renderScene = function(canvas) {
 		dt = 0.1;
 	}
 	var anyMoving = false;
-	for (var i=0, N=gl.coins.length; i<N; ++i) {
-		gl.coins[i].move(gl, dt);
-		anyMoving |= !gl.coins[i].isStopped;
+	for (var i=gl.coins.length-1; i>=0; --i) {
+		if (gl.coins[i] && !gl.coins[i].isStopped) {
+			gl.coins[i].move(gl, dt);
+			anyMoving = true;
+		}
 	}
 	if (!anyMoving) {
 		gl.updated = false;
@@ -410,12 +445,14 @@ coinBucket.renderScene = function(canvas) {
 	// Create instancing positions.
 	gl.enableVertexAttribArray(gl.offsetLocation);
 	var offsets = [];
-	var xf = 2 / canvas.width;
-	var yf = 2 / canvas.height;
+	var xf = 2 / gl.canvas.width;
+	var yf = 2 / gl.canvas.height;
 	for (var i=0, N=gl.coins.length; i<N; ++i) {
-		var x = gl.coins[i].x * xf;
-		var y = (gl.coins[i].y - canvas.height/2 + 20) * yf;
-		offsets.push(x, y);
+		if (gl.coins[i]) {
+			var x = gl.coins[i].x * xf;
+			var y = (gl.coins[i].y - gl.canvas.height/2 + 20) * yf;
+			offsets.push(x, y);
+		}
 	}
 	gl.bindBuffer(gl.ARRAY_BUFFER, gl.offsetBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(offsets), gl.DYNAMIC_DRAW);
